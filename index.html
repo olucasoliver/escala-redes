@@ -30,6 +30,12 @@
             --dayoff-border: #93c5fd;
             --double-bg: #fce7f3;
             --double-border: #f9a8d4;
+            --holiday-bg: #fff7ed;
+            --holiday-border: #fdba74;
+            --plantao-bg: #f0fdf4;
+            --plantao-border: #4ade80;
+            --custom-bg: #f5f3ff;
+            --custom-border: #c4b5fd;
             --sidebar-width: 280px;
             --header-height: 60px;
         }
@@ -499,6 +505,21 @@
         .double-cell {
             background: var(--double-bg);
             border-color: var(--double-border);
+        }
+
+        .holiday-cell {
+            background: var(--holiday-bg);
+            border-color: var(--holiday-border);
+        }
+
+        .plantao-cell {
+            background: var(--plantao-bg);
+            border-color: var(--plantao-border);
+        }
+
+        .custom-cell {
+            background: var(--custom-bg);
+            border-color: var(--custom-border);
         }
 
         .time-slot {
@@ -1140,12 +1161,30 @@
                         <div class="legend-color" style="background: var(--double-bg); border-color: var(--double-border);"></div>
                         <span>Folga Dupla</span>
                     </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--holiday-bg); border-color: var(--holiday-border);"></div>
+                        <span>Folga Feriado</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--plantao-bg); border-color: var(--plantao-border);"></div>
+                        <span>Plantão</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: var(--custom-bg); border-color: var(--custom-border);"></div>
+                        <span>Personalizado</span>
+                    </div>
                     <div class="legend-item" style="margin-left:auto; font-size:11px; color:#9ca3af;">
                         🔵 = Alteração manual | Clique na célula para editar
                     </div>
                 </div>
 
-                <div class="schedule-container">
+                <div class="schedule-container" id="scheduleContainer">
+                    <div style="display:flex; justify-content:flex-end; padding:8px 12px; border-bottom:1px solid #e5e7eb; gap:8px; align-items:center;">
+                        <span style="font-size:12px; color:#9ca3af;">Visualização:</span>
+                        <button class="btn btn-sm btn-outline" id="btnFitPage" onclick="toggleFitPage()" title="Distribuir todos os dias na tela sem rolagem horizontal">
+                            ⇔ Distribuir na Página
+                        </button>
+                    </div>
                     <table class="schedule-table" id="scheduleTable">
                         <thead id="tableHeader"></thead>
                         <tbody id="tableBody"></tbody>
@@ -1282,6 +1321,8 @@
                                     <option value="folga">Folga</option>
                                     <option value="ferias">Férias</option>
                                     <option value="dupla">Folga Dupla</option>
+                                    <option value="feriado">Folga Feriado</option>
+                                    <option value="plantao">Plantão</option>
                                     <option value="outro">Outro</option>
                                 </select>
                             </div>
@@ -1400,9 +1441,17 @@
                             <option value="ferias">Férias</option>
                             <option value="folga">Folga</option>
                             <option value="dupla">Folga Dupla</option>
-                            <option value="outro">Outro</option>
+                            <option value="feriado">Folga Feriado</option>
+                            <option value="plantao">Plantão</option>
+                            <option value="custom">Personalizado...</option>
                             <option value="clear">Limpar (padrão)</option>
                         </select>
+                    </div>
+                </div>
+                <div id="ecCustomLabelGroup" style="display:none;">
+                    <div class="form-group">
+                        <label>Nome do Tipo Personalizado</label>
+                        <input type="text" id="ecCustomLabel" placeholder="Ex: Compensação, Afastamento, etc." maxlength="30">
                     </div>
                 </div>
                 <div id="ecTimeFields">
@@ -1718,10 +1767,19 @@
                             cellContent = '<span class="time-slot bold" style="font-size:11px;">FOLGA</span>';
                         } else if (data.type === 'dupla') {
                             cellClass = 'double-cell';
-                            cellContent = '<span class="time-slot bold" style="font-size:11px;">FOLGA DUPLO</span>';
+                            cellContent = '<span class="time-slot bold" style="font-size:10px;">FOLGA<br>DUPLA</span>';
+                        } else if (data.type === 'feriado') {
+                            cellClass = 'holiday-cell';
+                            cellContent = '<span class="time-slot bold" style="font-size:10px;">FOLGA<br>FERIADO</span>';
+                        } else if (data.type === 'plantao') {
+                            cellClass = 'plantao-cell';
+                            cellContent = `<span class="time-slot bold" style="font-size:11px;">PLANTÃO</span>`;
+                        } else if (data.type === 'custom') {
+                            cellClass = 'custom-cell';
+                            cellContent = `<span class="time-slot bold" style="font-size:10px;">${data.customLabel || 'OUTRO'}</span>`;
                         } else {
-                            cellClass = 'double-cell';
-                            cellContent = '<span class="time-slot bold" style="font-size:11px;">OUTRO</span>';
+                            cellClass = 'custom-cell';
+                            cellContent = `<span class="time-slot bold" style="font-size:10px;">${data.customLabel || 'OUTRO'}</span>`;
                         }
                         hasOverride = data.isStandard !== true;
                     } else if (isWknd) {
@@ -1850,13 +1908,17 @@
                     'folga': 'Folga',
                     'ferias': 'Férias',
                     'dupla': 'Folga Dupla',
+                    'feriado': 'Folga Feriado',
+                    'plantao': 'Plantão',
                     'outro': 'Outro'
                 };
                 const typeColors = {
                     'folga': 'var(--dayoff-bg)',
                     'ferias': 'var(--vacation-bg)',
                     'dupla': 'var(--double-bg)',
-                    'outro': 'var(--double-bg)'
+                    'feriado': 'var(--holiday-bg)',
+                    'plantao': 'var(--plantao-bg)',
+                    'outro': 'var(--custom-bg)'
                 };
                 const startDate = period.start.split('-').reverse().join('/');
                 const endDate = period.end.split('-').reverse().join('/');
@@ -2121,6 +2183,7 @@
                 document.getElementById('ecLunchIn').value = data.lunchIn || '';
                 document.getElementById('ecExit').value = data.exit || '';
                 document.getElementById('ecObservation').value = data.observation || data.reason || '';
+                document.getElementById('ecCustomLabel').value = data.customLabel || '';
             } else {
                 const year = d.getFullYear();
                 const month = d.getMonth();
@@ -2146,6 +2209,12 @@
                 }
                 document.getElementById('ecType').value = 'work';
                 document.getElementById('ecObservation').value = '';
+                document.getElementById('ecCustomLabel').value = '';
+                // Sugerir Plantão para sábado e domingo
+                const dow = d.getDay();
+                if (dow === 0 || dow === 6) {
+                    document.getElementById('ecType').value = 'plantao';
+                }
             }
 
             toggleTimeFields();
@@ -2165,12 +2234,14 @@
             if (type === 'clear') {
                 delete overrides[key];
             } else {
+                const isWorkLike = type === 'work' || type === 'plantao';
                 overrides[key] = {
                     type,
-                    entry: type === 'work' ? document.getElementById('ecEntry').value : '',
-                    lunchOut: type === 'work' ? document.getElementById('ecLunchOut').value : '',
-                    lunchIn: type === 'work' ? document.getElementById('ecLunchIn').value : '',
-                    exit: type === 'work' ? document.getElementById('ecExit').value : '',
+                    entry: isWorkLike ? document.getElementById('ecEntry').value : '',
+                    lunchOut: isWorkLike ? document.getElementById('ecLunchOut').value : '',
+                    lunchIn: isWorkLike ? document.getElementById('ecLunchIn').value : '',
+                    exit: isWorkLike ? document.getElementById('ecExit').value : '',
+                    customLabel: type === 'custom' ? document.getElementById('ecCustomLabel').value.trim() : '',
                     observation,
                     updatedAt: new Date().toISOString()
                 };
@@ -2185,7 +2256,9 @@
         function toggleTimeFields() {
             const type = document.getElementById('ecType').value;
             const fields = document.getElementById('ecTimeFields');
-            fields.style.display = type === 'work' ? 'block' : 'none';
+            const customGroup = document.getElementById('ecCustomLabelGroup');
+            fields.style.display = (type === 'work' || type === 'plantao') ? 'block' : 'none';
+            customGroup.style.display = type === 'custom' ? 'block' : 'none';
         }
 
         function applyAllQuickSchedules() {
@@ -2421,13 +2494,21 @@
                             cellStyles.fillColor = [219, 234, 254];
                             cellStyles.textColor = [30, 64, 175];
                         } else if (data.type === 'dupla') {
-                            cellContent = 'FOLGA\nDUPLO';
+                            cellContent = 'FOLGA\nDUPLA';
                             cellStyles.fillColor = [252, 231, 243];
                             cellStyles.textColor = [157, 23, 77];
+                        } else if (data.type === 'feriado') {
+                            cellContent = 'FOLGA\nFERIADO';
+                            cellStyles.fillColor = [255, 247, 237];
+                            cellStyles.textColor = [154, 52, 18];
+                        } else if (data.type === 'plantao') {
+                            cellContent = 'PLANTÃO';
+                            cellStyles.fillColor = [240, 253, 244];
+                            cellStyles.textColor = [21, 128, 61];
                         } else {
-                            cellContent = 'OUTRO';
-                            cellStyles.fillColor = [252, 231, 243];
-                            cellStyles.textColor = [157, 23, 77];
+                            cellContent = data.customLabel || 'OUTRO';
+                            cellStyles.fillColor = [245, 243, 255];
+                            cellStyles.textColor = [109, 40, 217];
                         }
                     } else if (isWknd) {
                         cellContent = '—';
@@ -2484,7 +2565,9 @@
                 { label: 'Trabalho', color: [220, 252, 231] },
                 { label: 'Férias', color: [254, 243, 199] },
                 { label: 'Folga', color: [219, 234, 254] },
-                { label: 'Folga Dupla', color: [252, 231, 243] }
+                { label: 'Folga Dupla', color: [252, 231, 243] },
+                { label: 'Folga Feriado', color: [255, 247, 237] },
+                { label: 'Plantão', color: [240, 253, 244] }
             ];
 
             let legendX = 14;
@@ -2517,6 +2600,34 @@
                 document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
             }
         });
+
+        let fitPageMode = false;
+        function toggleFitPage() {
+            fitPageMode = !fitPageMode;
+            const container = document.getElementById('scheduleContainer');
+            const table = document.getElementById('scheduleTable');
+            const btn = document.getElementById('btnFitPage');
+            if (fitPageMode) {
+                container.style.overflowX = 'hidden';
+                table.style.minWidth = '0';
+                table.style.tableLayout = 'fixed';
+                table.style.width = '100%';
+                btn.textContent = '↔ Modo Normal';
+                btn.classList.add('btn-primary');
+                btn.classList.remove('btn-outline');
+                // Reduce font in cells for fit mode
+                document.querySelectorAll('.time-slot').forEach(el => el.style.fontSize = '8px');
+            } else {
+                container.style.overflowX = 'auto';
+                table.style.minWidth = '1000px';
+                table.style.tableLayout = '';
+                table.style.width = '';
+                btn.textContent = '⇔ Distribuir na Página';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline');
+                document.querySelectorAll('.time-slot').forEach(el => el.style.fontSize = '');
+            }
+        }
 
         render();
     </script>
