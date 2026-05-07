@@ -433,8 +433,15 @@
             color: var(--primary);
             position: sticky;
             top: 0;
-            z-index: 20;
+            z-index: 10;
             font-size: 11px;
+        }
+
+        /* Corner cell: sticky top + sticky left — highest z-index */
+        .schedule-table th:first-child {
+            left: 0;
+            z-index: 31;
+            background: #f8fafc;
         }
 
         .schedule-table th.weekend-col {
@@ -450,7 +457,7 @@
             min-width: 100px;
             position: sticky;
             left: 0;
-            z-index: 15;
+            z-index: 20;
             font-size: 13px;
             color: var(--primary);
             display: flex;
@@ -1518,6 +1525,7 @@
 
     <script>
         let currentDate = new Date();
+        let fitPageMode = false;
         let employees = JSON.parse(localStorage.getItem('emp_employees')) || getDefaultEmployees();
         let scheduleData = JSON.parse(localStorage.getItem('emp_scheduleData')) || {};
         let overrides = JSON.parse(localStorage.getItem('emp_overrides')) || {};
@@ -1619,6 +1627,11 @@
             renderQuickSchedules();
             renderSystemSummary();
             populateSelects();
+            // Re-apply fit mode after re-render
+            if (fitPageMode) {
+                fitPageMode = false; // reset so toggleFitPage re-activates
+                toggleFitPage();
+            }
         }
 
         function renderMonthControls() {
@@ -1661,7 +1674,6 @@
             let totalVacationDays = 0;
             let totalDayOffDays = 0;
             let totalEmployees = employees.length;
-            let totalOverrides = 0;
 
             for (const emp of employees) {
                 for (let d = 1; d <= daysInMonth; d++) {
@@ -1669,15 +1681,9 @@
                     const data = getCellData(emp.name, dateStr);
 
                     if (data) {
-                        totalOverrides++;
-                        if (data.type === 'work') totalWorkDays++;
+                        if (data.type === 'work' || data.type === 'plantao') totalWorkDays++;
                         else if (data.type === 'ferias') totalVacationDays++;
-                        else totalDayOffDays++;
-                    } else if (!isWeekend(dateStr)) {
-                        const stdKey = `${emp.name}_${year}_${month}`;
-                        if (standardSchedules[stdKey]) {
-                            totalWorkDays++;
-                        }
+                        else if (['folga','dupla','feriado'].includes(data.type)) totalDayOffDays++;
                     }
                 }
             }
@@ -1691,7 +1697,7 @@
                 <div class="stat-card">
                     <div class="stat-label">Dias de Trabalho</div>
                     <div class="stat-value" style="color:var(--success)">${totalWorkDays}</div>
-                    <div class="stat-sub">no mês</div>
+                    <div class="stat-sub">total no mês (todos os func.)</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">Férias</div>
@@ -1712,7 +1718,7 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();
 
             const headerRow = document.getElementById('tableHeader');
-            let headerHTML = '<th style="min-width:110px; position:sticky; left:0; z-index:25; background:#f8fafc;">FUNCIONÁRIO</th>';
+            let headerHTML = '<tr><th style="min-width:110px; position:sticky; left:0; z-index:31; background:#f8fafc;">FUNCIONÁRIO</th>';
             
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -1726,6 +1732,7 @@
                     </th>
                 `;
             }
+            headerHTML += '</tr>';
             headerRow.innerHTML = headerHTML;
 
             const tbody = document.getElementById('tableBody');
@@ -1758,6 +1765,7 @@
                                 ${data.lunchOut ? `<span class="time-slot">${data.lunchOut}</span>` : ''}
                                 ${data.lunchIn ? `<span class="time-slot">${data.lunchIn}</span>` : ''}
                                 <span class="time-slot">${data.exit || ''}</span>
+                                ${data.observation ? `<span class="time-slot" style="font-size:9px;color:#166534;font-style:italic;">${data.observation}</span>` : ''}
                             `;
                         } else if (data.type === 'ferias') {
                             cellClass = 'vacation-cell';
@@ -1773,10 +1781,24 @@
                             cellContent = '<span class="time-slot bold" style="font-size:10px;">FOLGA<br>FERIADO</span>';
                         } else if (data.type === 'plantao') {
                             cellClass = 'plantao-cell';
-                            cellContent = `<span class="time-slot bold" style="font-size:11px;">PLANTÃO</span>`;
+                            cellContent = `
+                                <span class="time-slot bold" style="font-size:10px;">PLANTÃO</span>
+                                ${data.entry ? `<span class="time-slot">${data.entry}</span>` : ''}
+                                ${data.lunchOut ? `<span class="time-slot">${data.lunchOut}</span>` : ''}
+                                ${data.lunchIn ? `<span class="time-slot">${data.lunchIn}</span>` : ''}
+                                ${data.exit ? `<span class="time-slot">${data.exit}</span>` : ''}
+                                ${data.observation ? `<span class="time-slot" style="font-size:9px;color:#15803d;font-style:italic;">${data.observation}</span>` : ''}
+                            `;
                         } else if (data.type === 'custom') {
                             cellClass = 'custom-cell';
-                            cellContent = `<span class="time-slot bold" style="font-size:10px;">${data.customLabel || 'OUTRO'}</span>`;
+                            cellContent = `
+                                <span class="time-slot bold" style="font-size:10px;">${data.customLabel || 'OUTRO'}</span>
+                                ${data.entry ? `<span class="time-slot">${data.entry}</span>` : ''}
+                                ${data.lunchOut ? `<span class="time-slot">${data.lunchOut}</span>` : ''}
+                                ${data.lunchIn ? `<span class="time-slot">${data.lunchIn}</span>` : ''}
+                                ${data.exit ? `<span class="time-slot">${data.exit}</span>` : ''}
+                                ${data.observation ? `<span class="time-slot" style="font-size:9px;color:#6d28d9;font-style:italic;">${data.observation}</span>` : ''}
+                            `;
                         } else {
                             cellClass = 'custom-cell';
                             cellContent = `<span class="time-slot bold" style="font-size:10px;">${data.customLabel || 'OUTRO'}</span>`;
@@ -2234,7 +2256,7 @@
             if (type === 'clear') {
                 delete overrides[key];
             } else {
-                const isWorkLike = type === 'work' || type === 'plantao';
+                const isWorkLike = ['work', 'plantao', 'custom'].includes(type);
                 overrides[key] = {
                     type,
                     entry: isWorkLike ? document.getElementById('ecEntry').value : '',
@@ -2257,7 +2279,8 @@
             const type = document.getElementById('ecType').value;
             const fields = document.getElementById('ecTimeFields');
             const customGroup = document.getElementById('ecCustomLabelGroup');
-            fields.style.display = (type === 'work' || type === 'plantao') ? 'block' : 'none';
+            const showTimes = ['work', 'plantao', 'custom'];
+            fields.style.display = showTimes.includes(type) ? 'block' : 'none';
             customGroup.style.display = type === 'custom' ? 'block' : 'none';
         }
 
@@ -2601,7 +2624,6 @@
             }
         });
 
-        let fitPageMode = false;
         function toggleFitPage() {
             fitPageMode = !fitPageMode;
             const container = document.getElementById('scheduleContainer');
@@ -2615,8 +2637,43 @@
                 btn.textContent = '↔ Modo Normal';
                 btn.classList.add('btn-primary');
                 btn.classList.remove('btn-outline');
-                // Reduce font in cells for fit mode
-                document.querySelectorAll('.time-slot').forEach(el => el.style.fontSize = '8px');
+                document.querySelectorAll('.time-slot').forEach(el => el.style.fontSize = '7px');
+                // Disable sticky
+                document.querySelectorAll('#scheduleTable th').forEach(el => el.style.position = 'static');
+                document.querySelectorAll('#scheduleTable .employee-cell').forEach(el => el.style.position = 'static');
+                // Fix first column width, shrink day columns
+                const ths = table.querySelectorAll('thead tr th');
+                ths.forEach((th, i) => {
+                    if (i === 0) {
+                        th.style.width = '80px';
+                        th.style.minWidth = '80px';
+                        th.style.fontSize = '11px';
+                        th.style.overflow = 'hidden';
+                    } else {
+                        th.style.width = '';
+                        th.style.minWidth = '0';
+                        th.style.fontSize = '9px';
+                        th.style.padding = '3px 1px';
+                    }
+                });
+                // Shrink employee name cells
+                document.querySelectorAll('#scheduleTable .employee-cell').forEach(el => {
+                    el.style.fontSize = '10px';
+                    el.style.paddingLeft = '4px';
+                    el.style.gap = '3px';
+                    el.style.overflow = 'hidden';
+                    el.style.whiteSpace = 'nowrap';
+                });
+                document.querySelectorAll('#scheduleTable .employee-avatar').forEach(el => {
+                    el.style.width = '20px';
+                    el.style.height = '20px';
+                    el.style.fontSize = '8px';
+                    el.style.flexShrink = '0';
+                });
+                document.querySelectorAll('#scheduleTable .time-cell').forEach(el => {
+                    el.style.padding = '2px 1px';
+                    el.style.fontSize = '7px';
+                });
             } else {
                 container.style.overflowX = 'auto';
                 table.style.minWidth = '1000px';
@@ -2626,6 +2683,36 @@
                 btn.classList.remove('btn-primary');
                 btn.classList.add('btn-outline');
                 document.querySelectorAll('.time-slot').forEach(el => el.style.fontSize = '');
+                // Restore sticky
+                document.querySelectorAll('#scheduleTable th').forEach(el => {
+                    el.style.position = 'sticky';
+                    el.style.top = '0';
+                });
+                document.querySelectorAll('#scheduleTable .employee-cell').forEach(el => el.style.position = 'sticky');
+                // Reset all inline styles
+                table.querySelectorAll('thead tr th').forEach((th, i) => {
+                    th.style.width = i === 0 ? '110px' : '65px';
+                    th.style.minWidth = i === 0 ? '110px' : '65px';
+                    th.style.fontSize = '';
+                    th.style.padding = '';
+                });
+                document.querySelectorAll('#scheduleTable .employee-cell').forEach(el => {
+                    el.style.fontSize = '';
+                    el.style.paddingLeft = '';
+                    el.style.gap = '';
+                    el.style.overflow = '';
+                    el.style.whiteSpace = '';
+                });
+                document.querySelectorAll('#scheduleTable .employee-avatar').forEach(el => {
+                    el.style.width = '';
+                    el.style.height = '';
+                    el.style.fontSize = '';
+                    el.style.flexShrink = '';
+                });
+                document.querySelectorAll('#scheduleTable .time-cell').forEach(el => {
+                    el.style.padding = '';
+                    el.style.fontSize = '';
+                });
             }
         }
 
